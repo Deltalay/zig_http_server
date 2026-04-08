@@ -9,11 +9,12 @@ const secret = "";
 const absolute_path = "";
 const METHOD = enum { POST, GET, UNKNOWN };
 pub fn main() !void {
+    // ALot of these are copy from official zig test file.
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const address = try std.net.Address.parseIp4("127.0.0.1", 3000);
+    const address = try net.Address.parseIp4("127.0.0.1", 3000);
     var server = try address.listen(.{});
 
     defer server.deinit();
@@ -95,7 +96,7 @@ pub fn verifySig(body: []const u8, sigHeader: []const u8) !bool {
     return std.mem.eql(u8, sigHeader[expectedPrefix.len..], buf[0..]);
 }
 pub fn file_dir() !void {
-    var dir = std.fs.cwd().openDir(absolute_path, .{ .iterate = true }) catch |err| switch (err) {
+    var dir = fs.cwd().openDir(absolute_path, .{ .iterate = true }) catch |err| switch (err) {
         error.NotDir => return,
         else => {
             std.debug.print("Error opening dir: {}\n", .{err});

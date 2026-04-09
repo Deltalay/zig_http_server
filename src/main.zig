@@ -7,13 +7,14 @@ const bufPrint = std.fmt.bufPrint;
 
 const secret = "";
 const absolute_path = "";
-const METHOD = enum { POST, GET, UNKNOWN };
+
 pub fn main() !void {
     // ALot of these are copy from official zig test file.
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
-
+    var map: std.StringHashMap([]const u8) = .init(allocator);
+    defer map.deinit();
     const address = try net.Address.parseIp4("127.0.0.1", 3000);
     var server = try address.listen(.{});
 
@@ -33,42 +34,39 @@ pub fn main() !void {
             var server_http = std.http.Server.init(reader.interface(), &writer.interface);
 
             var req = try server_http.receiveHead();
-            const raw_head = getHeader(&req, "User-Agent");
-            var safe_head: ?[]const u8 = null;
-            if (raw_head) |h| {
-                safe_head = try allocator.dupe(u8, h);
-            }
-            defer if (safe_head) |h| allocator.free(h);
+
+            try put_header_to_map(req, &map);
+
+            const x_hub_sig = map.get("User-Agent");
             var reader_req = try req.readerExpectContinue(&.{});
             const body = try reader_req.allocRemaining(allocator, .unlimited);
             defer allocator.free(body);
 
-            const resp_text: []const u8 = switch (req.head.method) {
-                .GET => "hello! {}",
-                .POST => "POST",
-                else => "UNKNOWN",
-            };
+            const method = req.head.method;
+            switch (method) {
+                .POST => {
+                    std.debug.print("Body: {s}\n", .{body});
+                    if (x_hub_sig) |x| {
+                        std.debug.print("Agent {s}\n", .{x});
+                    }
+                    // const is_valid = try verifySig(body, s);
+                    // std.debug.print("Valid: {}\n", .{is_valid});
 
-            if (safe_head) |s| {
-                std.debug.print("Agent: {s}\n", .{s});
-                std.debug.print("Body: {s}\n", .{body});
-                // const is_valid = try verifySig(body, s);
-                // std.debug.print("Valid: {}\n", .{is_valid});
+                },
+                else => {},
             }
             std.debug.print("Body: {s}\n", .{body});
-            try req.respond(resp_text, .{ .keep_alive = false });
+            try req.respond("", .{ .keep_alive = false });
         }
     }
 }
-pub fn getHeader(req: *std.http.Server.Request, header_name: []const u8) ?[]const u8 {
+
+pub fn put_header_to_map(req: std.http.Server.Request, map: *std.StringHashMap([]const u8)) !void {
     var it = req.iterateHeaders();
     while (true) {
         const header = it.next() orelse break;
-        if (std.mem.eql(u8, header.name, header_name)) {
-            return header.value;
-        }
+        try map.put(header.name, header.value);
     }
-    return null;
 }
 pub fn verifySig(body: []const u8, sigHeader: []const u8) !bool {
     const H = crypto.hash.sha256;

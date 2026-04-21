@@ -37,7 +37,7 @@ pub fn main() !void {
 
             try put_header_to_map(req, &map);
 
-            const x_hub_sig = map.get("User-Agent");
+            const x_hub_sig = map.get("X-Hub-Signature-256");
             var reader_req = try req.readerExpectContinue(&.{});
             const body = try reader_req.allocRemaining(allocator, .unlimited);
             defer allocator.free(body);
@@ -47,10 +47,14 @@ pub fn main() !void {
                 .POST => {
                     std.debug.print("Body: {s}\n", .{body});
                     if (x_hub_sig) |x| {
-                        std.debug.print("Agent {s}\n", .{x});
+                        std.debug.print("X-Hub-Signature-256 {s}\n", .{x});
+                        const is_valid = try verifySig(body, x);
+                        if (is_valid)
+                        {
+                            // Check which webhook send, and go to directory and run a git pull
+
+                        }
                     }
-                    // const is_valid = try verifySig(body, s);
-                    // std.debug.print("Valid: {}\n", .{is_valid});
 
                 },
                 else => {},
